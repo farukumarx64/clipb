@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Settings, Clipboard } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
@@ -33,6 +33,12 @@ import {
   setLaunchOnStartup,
   toggleQuickWindow,
 } from "./lib/desktop";
+
+import {
+  Toast,
+  type ToastMessage,
+  type ToastVariant,
+} from "./components/Toast";
 
 function groupClipsByDay(clips: Clip[]) {
   return clips.reduce<Record<string, Clip[]>>((groups, clip) => {
@@ -122,6 +128,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const toastTimerRef = useRef<number | null>(null);
 
   const loadClips = useCallback(async () => {
     setLoading(true);
@@ -226,6 +235,35 @@ export default function App() {
     });
   }, [groupedClips]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  function showToast(
+    title: string,
+    description?: string,
+    variant: ToastVariant = "info",
+  ) {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({
+      id: Date.now(),
+      title,
+      description,
+      variant,
+    });
+
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  }
+
   async function handleCopy(clip: Clip) {
     await writeText(clip.content);
 
@@ -252,12 +290,48 @@ export default function App() {
   }
 
   async function handleSaveSettings(nextSettings: AppSettings) {
+    const privateModeChanged =
+      nextSettings.privateMode !== settings.privateMode;
+    const pauseChanged = nextSettings.pauseUntil !== settings.pauseUntil;
+
     if (nextSettings.launchOnStartup !== settings.launchOnStartup) {
       await setLaunchOnStartup(nextSettings.launchOnStartup);
     }
 
     await updateAppSettings(nextSettings);
     setSettings(nextSettings);
+
+    if (privateModeChanged) {
+      if (nextSettings.privateMode) {
+        showToast(
+          "Private mode enabled",
+          "ClipB will not save new clipboard items until private mode is turned off.",
+          "private",
+        );
+      } else {
+        showToast(
+          "Private mode disabled",
+          "ClipB can save clipboard items again.",
+          "success",
+        );
+      }
+    }
+
+    if (!privateModeChanged && pauseChanged) {
+      if (nextSettings.pauseUntil && nextSettings.pauseUntil > Date.now()) {
+        showToast(
+          "Clipboard paused",
+          "ClipB will temporarily stop saving new clips.",
+          "warning",
+        );
+      } else {
+        showToast(
+          "Clipboard resumed",
+          "ClipB can save clipboard items again.",
+          "success",
+        );
+      }
+    }
 
     const deletedCount = await runRetentionCleanup(nextSettings);
 
@@ -465,6 +539,8 @@ export default function App() {
         onImport={handleImport}
         onClearAll={handleClearAll}
       />
+
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

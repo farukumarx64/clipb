@@ -448,8 +448,8 @@ export function SettingsModal({
           <section className="settings-section">
             <h3>Ignored apps</h3>
             <p>
-              Store app names you do not want ClipB to track. Active app
-              detection will be wired in a future update.
+              Store app names you do not want ClipB to track later. This list is
+              saved now, but active app blocking is not enabled yet.
             </p>
 
             <div className="ignored-app-form">
@@ -493,7 +493,11 @@ export function SettingsModal({
                 ))}
               </div>
             ) : (
-              <div className="settings-note">No ignored apps added yet.</div>
+              <div className="settings-note">
+                Ignored apps are stored for now. ClipB still needs active-window
+                detection before it can automatically block clips from these
+                apps.
+              </div>
             )}
           </section>
 
