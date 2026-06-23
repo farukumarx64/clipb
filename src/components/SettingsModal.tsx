@@ -157,25 +157,27 @@ export function SettingsModal({
             <h3>History retention</h3>
             <p>Choose how long ClipB keeps old clips.</p>
 
-            <label className="field-label select-field">
+            <label className="field-label">
               Auto-delete clips
-              <select
-                value={settings.historyRetentionDays}
-                title="Choose how long ClipB keeps old clips before auto-deleting them"
-                aria-label="Auto-delete clips retention period"
-                onChange={(event) =>
-                  updateSetting({
-                    ...settings,
-                    historyRetentionDays: event.target.value as RetentionDays,
-                  })
-                }
-              >
-                {retentionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <span className="select-control">
+                <select
+                  value={settings.historyRetentionDays}
+                  title="Choose how long ClipB keeps old clips before auto-deleting them"
+                  aria-label="Auto-delete clips retention period"
+                  onChange={(event) =>
+                    updateSetting({
+                      ...settings,
+                      historyRetentionDays: event.target.value as RetentionDays,
+                    })
+                  }
+                >
+                  {retentionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </label>
 
             <label className="setting-row">
