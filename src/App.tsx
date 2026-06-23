@@ -26,10 +26,7 @@ import {
   updateAppSettings,
 } from "./lib/db";
 import { useClipboardWatcher } from "./hooks/useClipboardWatcher";
-import {
-  exportClipsToJsonFile,
-  importClipsFromJsonFile,
-} from "./lib/backup";
+import { exportClipsToJsonFile, importClipsFromJsonFile } from "./lib/backup";
 
 function groupClipsByDay(clips: Clip[]) {
   return clips.reduce<Record<string, Clip[]>>((groups, clip) => {
@@ -49,6 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   historyRetentionDays: "never",
   protectPinnedClips: true,
   watchClipboard: true,
+  themeMode: "system",
 };
 
 export default function App() {
@@ -97,6 +95,10 @@ export default function App() {
       refreshData();
     },
   });
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.themeMode;
+  }, [settings.themeMode]);
 
   useEffect(() => {
     async function boot() {
@@ -191,7 +193,7 @@ export default function App() {
         {
           title: "ClipB import complete",
           kind: "info",
-        }
+        },
       );
     } catch (error) {
       console.error(error);
@@ -201,7 +203,7 @@ export default function App() {
         {
           title: "Import failed",
           kind: "error",
-        }
+        },
       );
     }
   }
@@ -212,7 +214,7 @@ export default function App() {
       {
         title: "Clear all clips?",
         kind: "warning",
-      }
+      },
     );
 
     if (!confirmed) return;
@@ -272,7 +274,10 @@ export default function App() {
               <ChevronLeft size={18} />
             </button>
 
-            <button className="today-button" onClick={() => setSelectedDate(new Date())}>
+            <button
+              className="today-button"
+              onClick={() => setSelectedDate(new Date())}
+            >
               Today
             </button>
 

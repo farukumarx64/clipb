@@ -5,6 +5,7 @@ import type {
   DailyCount,
   ExportedClip,
   RetentionDays,
+  ThemeMode,
 } from "../types";
 import { hashText } from "./hash";
 
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   historyRetentionDays: "never",
   protectPinnedClips: true,
   watchClipboard: true,
+  themeMode: "system",
 };
 
 async function initDb(db: Db) {
@@ -60,7 +62,7 @@ async function initDb(db: Db) {
       INSERT OR IGNORE INTO settings (key, value)
       VALUES (?, ?);
     `,
-    ["history_retention_days", DEFAULT_SETTINGS.historyRetentionDays],
+    ["theme_mode", DEFAULT_SETTINGS.themeMode]
   );
 
   await db.execute(
@@ -267,7 +269,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     `
       SELECT key, value
       FROM settings;
-    `,
+    `
   );
 
   const map = new Map(rows.map((row) => [row.key, row.value]));
@@ -284,13 +286,22 @@ export async function getAppSettings(): Promise<AppSettings> {
   ];
 
   const historyRetentionDays = validRetentionValues.includes(
-    retentionValue as RetentionDays,
+    retentionValue as RetentionDays
   )
     ? (retentionValue as RetentionDays)
     : DEFAULT_SETTINGS.historyRetentionDays;
 
+  const themeValue = map.get("theme_mode");
+
+  const validThemeValues: ThemeMode[] = ["system", "light", "dark"];
+
+  const themeMode = validThemeValues.includes(themeValue as ThemeMode)
+    ? (themeValue as ThemeMode)
+    : DEFAULT_SETTINGS.themeMode;
+
   return {
     historyRetentionDays,
+    themeMode,
     protectPinnedClips:
       map.get("protect_pinned_clips") === undefined
         ? DEFAULT_SETTINGS.protectPinnedClips
@@ -328,6 +339,14 @@ export async function updateAppSettings(settings: AppSettings): Promise<void> {
     `,
     ["watch_clipboard", String(settings.watchClipboard)],
   );
+
+  await db.execute(
+  `
+    INSERT OR REPLACE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+  ["theme_mode", settings.themeMode]
+);
 }
 
 export async function runRetentionCleanup(

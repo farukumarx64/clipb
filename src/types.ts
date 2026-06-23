@@ -2,6 +2,8 @@ export type ViewMode = "day" | "week" | "month" | "year";
 
 export type RetentionDays = "never" | "7" | "30" | "90" | "180" | "365";
 
+export type ThemeMode = "system" | "light" | "dark";
+
 export interface Clip {
   id: number;
   content: string;
@@ -21,6 +23,7 @@ export interface AppSettings {
   historyRetentionDays: RetentionDays;
   protectPinnedClips: boolean;
   watchClipboard: boolean;
+  themeMode: ThemeMode;
 }
 
 export interface ExportedClip {

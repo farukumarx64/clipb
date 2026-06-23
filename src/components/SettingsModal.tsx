@@ -1,5 +1,5 @@
-import { Download, Trash2, Upload, X } from "lucide-react";
-import type { AppSettings, RetentionDays } from "../types";
+import { Download, Palette, Trash2, Upload, X } from "lucide-react";
+import type { AppSettings, RetentionDays, ThemeMode } from "../types";
 
 interface SettingsModalProps {
   open: boolean;
@@ -23,6 +23,28 @@ const retentionOptions: Array<{
   { label: "After 365 days", value: "365" },
 ];
 
+const themeOptions: Array<{
+  label: string;
+  value: ThemeMode;
+  description: string;
+}> = [
+  {
+    label: "System",
+    value: "system",
+    description: "Follow your computer appearance.",
+  },
+  {
+    label: "Light",
+    value: "light",
+    description: "Use ClipB in light mode.",
+  },
+  {
+    label: "Dark",
+    value: "dark",
+    description: "Use ClipB in dark mode.",
+  },
+];
+
 export function SettingsModal({
   open,
   settings,
@@ -44,15 +66,49 @@ export function SettingsModal({
         <header className="settings-modal__header">
           <div>
             <h2>Settings</h2>
-            <p>Backup, privacy, and local history controls.</p>
+            <p>Backup, privacy, appearance, and local history controls.</p>
           </div>
 
-          <button title="Close modal" className="modal-close-button" onClick={onClose}>
+          <button title="Close settings" className="modal-close-button" onClick={onClose}>
             <X size={18} />
           </button>
         </header>
 
         <div className="settings-modal__content">
+          <section className="settings-section settings-section--featured">
+            <div className="section-title-row">
+              <div>
+                <h3>Appearance</h3>
+                <p>Choose how ClipB should look.</p>
+              </div>
+
+              <div className="section-icon">
+                <Palette size={18} />
+              </div>
+            </div>
+
+            <div className="theme-options">
+              {themeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={[
+                    "theme-option",
+                    settings.themeMode === option.value ? "active" : "",
+                  ].join(" ")}
+                  onClick={() =>
+                    updateSetting({
+                      ...settings,
+                      themeMode: option.value,
+                    })
+                  }
+                >
+                  <strong>{option.label}</strong>
+                  <span>{option.description}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="settings-section">
             <h3>Clipboard watcher</h3>
             <p>Pause ClipB when you do not want new clipboard items saved.</p>
@@ -81,12 +137,12 @@ export function SettingsModal({
             <p>Export or import your text clipboard history as JSON.</p>
 
             <div className="settings-actions-grid">
-              <button title="Export JSON" className="settings-action-button" onClick={onExport}>
+              <button className="settings-action-button" onClick={onExport}>
                 <Download size={17} />
                 Export JSON
               </button>
 
-              <button title="Import JSON" className="settings-action-button" onClick={onImport}>
+              <button className="settings-action-button" onClick={onImport}>
                 <Upload size={17} />
                 Import JSON
               </button>
