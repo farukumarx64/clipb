@@ -24,6 +24,7 @@ export interface AppSettings {
   protectPinnedClips: boolean;
   watchClipboard: boolean;
   themeMode: ThemeMode;
+  launchOnStartup: boolean;
 }
 
 export interface ExportedClip {

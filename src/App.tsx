@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, Clipboard } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 
@@ -28,6 +28,13 @@ import {
 import { useClipboardWatcher } from "./hooks/useClipboardWatcher";
 import { exportClipsToJsonFile, importClipsFromJsonFile } from "./lib/backup";
 
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import {
+  getLaunchOnStartupEnabled,
+  setLaunchOnStartup,
+  toggleQuickWindow,
+} from "./lib/desktop";
+
 function groupClipsByDay(clips: Clip[]) {
   return clips.reduce<Record<string, Clip[]>>((groups, clip) => {
     const key = toDayKey(clip.created_at);
@@ -47,6 +54,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   protectPinnedClips: true,
   watchClipboard: true,
   themeMode: "system",
+  launchOnStartup: false,
 };
 
 export default function App() {
@@ -59,6 +67,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+
+  useGlobalShortcuts();
 
   const loadClips = useCallback(async () => {
     setLoading(true);
@@ -103,9 +113,23 @@ export default function App() {
   useEffect(() => {
     async function boot() {
       const loadedSettings = await getAppSettings();
-      setSettings(loadedSettings);
 
-      await runRetentionCleanup(loadedSettings);
+      const launchOnStartup = await getLaunchOnStartupEnabled().catch(() => {
+        return loadedSettings.launchOnStartup;
+      });
+
+      const mergedSettings = {
+        ...loadedSettings,
+        launchOnStartup,
+      };
+
+      setSettings(mergedSettings);
+
+      if (launchOnStartup !== loadedSettings.launchOnStartup) {
+        await updateAppSettings(mergedSettings);
+      }
+
+      await runRetentionCleanup(mergedSettings);
       await refreshData();
     }
 
@@ -150,6 +174,10 @@ export default function App() {
   }
 
   async function handleSaveSettings(nextSettings: AppSettings) {
+    if (nextSettings.launchOnStartup !== settings.launchOnStartup) {
+      await setLaunchOnStartup(nextSettings.launchOnStartup);
+    }
+
     await updateAppSettings(nextSettings);
     setSettings(nextSettings);
 
@@ -306,6 +334,15 @@ export default function App() {
               title="Settings"
             >
               <Settings size={18} />
+            </button>
+
+            <button
+              className="nav-button"
+              onClick={() => toggleQuickWindow()}
+              title="Open quick copy"
+              aria-label="Open quick copy"
+            >
+              <Clipboard size={18} />
             </button>
           </div>
         </header>

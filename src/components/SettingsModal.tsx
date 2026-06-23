@@ -1,4 +1,4 @@
-import { Download, Palette, Trash2, Upload, X } from "lucide-react";
+import { Download, Palette, Trash2, Upload, X, MonitorUp } from "lucide-react";
 import type { AppSettings, RetentionDays, ThemeMode } from "../types";
 
 interface SettingsModalProps {
@@ -110,6 +110,44 @@ export function SettingsModal({
                   <span>{option.description}</span>
                 </button>
               ))}
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <div className="section-title-row">
+              <div>
+                <h3>Desktop behavior</h3>
+                <p>Control how ClipB behaves as a desktop utility.</p>
+              </div>
+
+              <div className="section-icon">
+                <MonitorUp size={18} />
+              </div>
+            </div>
+
+            <label className="setting-row">
+              <div>
+                <strong>Launch on startup</strong>
+                <span>Start ClipB automatically when you log in.</span>
+              </div>
+
+              <input
+                type="checkbox"
+                checked={settings.launchOnStartup}
+                title="Launch ClipB on startup"
+                aria-label="Launch ClipB on startup"
+                onChange={(event) =>
+                  updateSetting({
+                    ...settings,
+                    launchOnStartup: event.target.checked,
+                  })
+                }
+              />
+            </label>
+
+            <div className="settings-note">
+              Closing or minimizing ClipB hides it to the tray. Use the tray
+              menu to fully quit.
             </div>
           </section>
 

@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   protectPinnedClips: true,
   watchClipboard: true,
   themeMode: "system",
+  launchOnStartup: false,
 };
 
 async function initDb(db: Db) {
@@ -62,7 +63,7 @@ async function initDb(db: Db) {
       INSERT OR IGNORE INTO settings (key, value)
       VALUES (?, ?);
     `,
-    ["theme_mode", DEFAULT_SETTINGS.themeMode]
+    ["theme_mode", DEFAULT_SETTINGS.themeMode],
   );
 
   await db.execute(
@@ -79,6 +80,14 @@ async function initDb(db: Db) {
       VALUES (?, ?);
     `,
     ["watch_clipboard", String(DEFAULT_SETTINGS.watchClipboard)],
+  );
+
+  await db.execute(
+    `
+    INSERT OR IGNORE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+    ["launch_on_startup", String(DEFAULT_SETTINGS.launchOnStartup)],
   );
 }
 
@@ -188,6 +197,41 @@ export async function getClips(options: {
   );
 }
 
+export async function getRecentClips(options?: {
+  query?: string;
+  limit?: number;
+}): Promise<Clip[]> {
+  const db = await getDb();
+
+  const query = options?.query?.trim();
+  const limit = options?.limit ?? 30;
+
+  if (query) {
+    return db.select<Clip[]>(
+      `
+        SELECT *
+        FROM clips
+        WHERE content_type = 'text/plain'
+          AND content LIKE ?
+        ORDER BY is_pinned DESC, created_at DESC
+        LIMIT ?;
+      `,
+      [`%${query}%`, limit]
+    );
+  }
+
+  return db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE content_type = 'text/plain'
+      ORDER BY is_pinned DESC, created_at DESC
+      LIMIT ?;
+    `,
+    [limit]
+  );
+}
+
 export async function getAllTextClips(): Promise<Clip[]> {
   const db = await getDb();
 
@@ -269,7 +313,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     `
       SELECT key, value
       FROM settings;
-    `
+    `,
   );
 
   const map = new Map(rows.map((row) => [row.key, row.value]));
@@ -286,7 +330,7 @@ export async function getAppSettings(): Promise<AppSettings> {
   ];
 
   const historyRetentionDays = validRetentionValues.includes(
-    retentionValue as RetentionDays
+    retentionValue as RetentionDays,
   )
     ? (retentionValue as RetentionDays)
     : DEFAULT_SETTINGS.historyRetentionDays;
@@ -310,6 +354,10 @@ export async function getAppSettings(): Promise<AppSettings> {
       map.get("watch_clipboard") === undefined
         ? DEFAULT_SETTINGS.watchClipboard
         : map.get("watch_clipboard") === "true",
+    launchOnStartup:
+      map.get("launch_on_startup") === undefined
+        ? DEFAULT_SETTINGS.launchOnStartup
+        : map.get("launch_on_startup") === "true",
   };
 }
 
@@ -341,12 +389,20 @@ export async function updateAppSettings(settings: AppSettings): Promise<void> {
   );
 
   await db.execute(
-  `
+    `
     INSERT OR REPLACE INTO settings (key, value)
     VALUES (?, ?);
   `,
-  ["theme_mode", settings.themeMode]
-);
+    ["theme_mode", settings.themeMode],
+  );
+
+  await db.execute(
+    `
+    INSERT OR REPLACE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+    ["launch_on_startup", String(settings.launchOnStartup)],
+  );
 }
 
 export async function runRetentionCleanup(
