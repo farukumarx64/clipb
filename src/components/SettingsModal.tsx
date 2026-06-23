@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Download,
   MonitorUp,
@@ -84,6 +84,24 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [ignoredAppInput, setIgnoredAppInput] = useState("");
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
   function addIgnoredApp() {
     const appName = ignoredAppInput.trim();
 
@@ -135,11 +153,17 @@ export function SettingsModal({
   }
 
   return (
-    <div className="modal-backdrop">
-      <section className="settings-modal">
+    <div className="modal-backdrop" onMouseDown={onClose} role="presentation">
+      <section
+        className="settings-modal"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
         <header className="settings-modal__header">
           <div>
-            <h2>Settings</h2>
+            <h2 id="settings-title">Settings</h2>
             <p>Backup, privacy, appearance, and local history controls.</p>
           </div>
 

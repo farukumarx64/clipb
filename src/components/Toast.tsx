@@ -1,3 +1,5 @@
+import { X } from "lucide-react";
+
 export type ToastVariant = "info" | "success" | "warning" | "private";
 
 export interface ToastMessage {
@@ -32,7 +34,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
         title="Dismiss notification"
         aria-label="Dismiss notification"
       >
-        x
+        <X size={15} aria-hidden="true" />
       </button>
     </div>
   );
