@@ -6,6 +6,13 @@ use tauri::{
 
 use serde::Serialize;
 
+use sha2::{Digest, Sha256};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 #[cfg(desktop)]
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -81,6 +88,115 @@ struct ActiveAppInfo {
     title: String,
     process_path: String,
     process_id: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct ImportedImageAsset {
+    content_hash: String,
+    asset_path: String,
+    asset_name: String,
+    asset_size: u64,
+    asset_mime: String,
+}
+
+fn image_mime_for_path(path: &Path) -> Option<&'static str> {
+    let extension = path.extension()?.to_string_lossy().to_lowercase();
+
+    match extension.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "webp" => Some("image/webp"),
+        "gif" => Some("image/gif"),
+        _ => None,
+    }
+}
+
+fn safe_asset_filename(original_path: &Path, mime: &str) -> Result<String, String> {
+    let extension = match mime {
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/webp" => "webp",
+        "image/gif" => "gif",
+        _ => "bin",
+    };
+
+    let stem = original_path
+        .file_stem()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| "image".to_string());
+
+    let safe_stem: String = stem
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect();
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_millis();
+
+    Ok(format!(
+        "{}-{}.{}",
+        if safe_stem.trim().is_empty() {
+            "image"
+        } else {
+            safe_stem.trim_matches('-')
+        },
+        timestamp,
+        extension
+    ))
+}
+
+#[tauri::command]
+fn import_image_file_to_assets(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<ImportedImageAsset, String> {
+    let source_path = PathBuf::from(path);
+
+    if !source_path.exists() {
+        return Err("Image file does not exist".to_string());
+    }
+
+    if !source_path.is_file() {
+        return Err("Clipboard path is not a file".to_string());
+    }
+
+    let mime = image_mime_for_path(&source_path)
+        .ok_or_else(|| "Clipboard file is not a supported image".to_string())?;
+
+    let bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let content_hash = hex::encode(hasher.finalize());
+
+    let assets_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("assets");
+
+    fs::create_dir_all(&assets_dir).map_err(|error| error.to_string())?;
+
+    let asset_name = safe_asset_filename(&source_path, mime)?;
+    let asset_path = assets_dir.join(&asset_name);
+
+    fs::write(&asset_path, &bytes).map_err(|error| error.to_string())?;
+
+    Ok(ImportedImageAsset {
+        content_hash,
+        asset_path: asset_path.to_string_lossy().into_owned(),
+        asset_name,
+        asset_size: bytes.len() as u64,
+        asset_mime: mime.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -188,7 +304,8 @@ pub fn run() {
             toggle_quick_window,
             hide_quick_window,
             quit_app,
-            get_active_app
+            get_active_app,
+            import_image_file_to_assets
         ])
         .setup(|app| {
             #[cfg(desktop)]

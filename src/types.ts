@@ -95,5 +95,6 @@ export type ClipContentType =
   | "image/png"
   | "image/jpeg"
   | "image/webp"
+  | "image/gif"
   | "file/path"
   | "file/backup";

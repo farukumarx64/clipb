@@ -11,6 +11,7 @@ import {
   PinOff,
   Trash2,
 } from "lucide-react";
+import { AssetImage } from "./AssetImage";
 import type { Clip, ClipTag } from "../types";
 import { ClipTags } from "./ClipTags";
 import { formatTime } from "../lib/dates";
@@ -84,9 +85,15 @@ export function ClipCard({
       </div>
 
       {clip.category === "image" ? (
-        <div className="clip-asset-preview">
-          <div className="clip-asset-preview__placeholder">
-            <ImageIcon size={24} aria-hidden="true" />
+        <div className="clip-image-preview">
+          <AssetImage
+            assetPath={clip.asset_path}
+            assetMime={clip.asset_mime}
+            assetName={clip.asset_name}
+            assetSize={clip.asset_size}
+          />
+
+          <div className="clip-asset-meta">
             <span>{getAssetLabel(clip)}</span>
             <small>{formatBytes(clip.asset_size)}</small>
           </div>
@@ -129,7 +136,13 @@ export function ClipCard({
         <button
           className="icon-button"
           onClick={() => onCopy(clip)}
-          title={copied ? "Copied" : "Copy clip"}
+          title={
+            clip.category === "image"
+              ? "Copy image filename"
+              : copied
+                ? "Copied"
+                : "Copy clip"
+          }
           aria-label={copied ? "Copied" : "Copy clip"}
         >
           {copied ? (
@@ -137,7 +150,7 @@ export function ClipCard({
           ) : (
             <Clipboard size={16} aria-hidden="true" />
           )}
-          {copied ? "Copied" : "Copy"}
+          {clip.category === "image" ? "Copy name" : copied ? "Copied" : "Copy"}
         </button>
 
         <button

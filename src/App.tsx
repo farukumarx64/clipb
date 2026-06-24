@@ -155,40 +155,51 @@ export default function App() {
 
   const toastTimerRef = useRef<number | null>(null);
 
-  const loadClips = useCallback(async () => {
-    setLoading(true);
+  const loadClips = useCallback(
+    async (options?: { showLoading?: boolean }) => {
+      const showLoading = options?.showLoading ?? true;
 
-    try {
-      const range = getRangeForView(selectedDate, viewMode);
+      if (showLoading) {
+        setLoading(true);
+      }
 
-      const rows = await getClipsByRangeWithFilters({
-        start: range.start,
-        end: range.end,
-        filters: {
-          query,
-          contentFilter,
-          pinnedOnly,
-          favoritesOnly,
-          selectedTagId,
-        },
-      });
+      try {
+        const range = getRangeForView(selectedDate, viewMode);
 
-      const tagsByClipId = await getTagsForClipIds(rows.map((clip) => clip.id));
+        const rows = await getClipsByRangeWithFilters({
+          start: range.start,
+          end: range.end,
+          filters: {
+            query,
+            contentFilter,
+            pinnedOnly,
+            favoritesOnly,
+            selectedTagId,
+          },
+        });
 
-      setClips(rows);
-      setClipTagsByClipId(tagsByClipId);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    selectedDate,
-    viewMode,
-    query,
-    contentFilter,
-    pinnedOnly,
-    favoritesOnly,
-    selectedTagId,
-  ]);
+        const tagsByClipId = await getTagsForClipIds(
+          rows.map((clip) => clip.id),
+        );
+
+        setClips(rows);
+        setClipTagsByClipId(tagsByClipId);
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    [
+      selectedDate,
+      viewMode,
+      query,
+      contentFilter,
+      pinnedOnly,
+      favoritesOnly,
+      selectedTagId,
+    ],
+  );
 
   const loadDailyCounts = useCallback(async () => {
     const counts = await getDailyCountsForMonth(selectedDate);
@@ -206,12 +217,15 @@ export default function App() {
     await loadAllTags();
   }, [loadClips, loadDailyCounts, loadAllTags]);
 
+  const handleClipboardSaved = useCallback(async () => {
+    await loadClips({ showLoading: false });
+    await loadDailyCounts();
+  }, [loadClips, loadDailyCounts]);
+
   const { error: watcherError } = useClipboardWatcher({
     settings,
     intervalMs: 1000,
-    onSaved: () => {
-      refreshData();
-    },
+    onSaved: handleClipboardSaved,
   });
 
   useEffect(() => {

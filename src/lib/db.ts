@@ -1228,8 +1228,23 @@ export async function saveAssetClip(options: {
   if (
     latestClip &&
     latestClip.content_hash === options.contentHash &&
-    latestClip.asset_path === options.assetPath
+    latestClip.content_type === options.contentType
   ) {
+    return null;
+  }
+
+  const existing = await db.select<Clip[]>(
+    `
+    SELECT *
+    FROM clips
+    WHERE content_hash = ?
+      AND content_type = ?
+    LIMIT 1;
+  `,
+    [options.contentHash, options.contentType],
+  );
+
+  if (existing.length > 0) {
     return null;
   }
 
