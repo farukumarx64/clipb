@@ -14,6 +14,22 @@ interface SidebarProps {
 
 const viewModes: ViewMode[] = ["day", "week", "month", "year"];
 
+function formatClipCount(count: number): string {
+  if (count < 1000) return String(count);
+
+  if (count < 1_000_000) {
+    const value = count / 1000;
+    return `${Number.isInteger(value) ? value : value.toFixed(1)}k`;
+  }
+
+  const value = count / 1_000_000;
+  return `${Number.isInteger(value) ? value : value.toFixed(1)}m`;
+}
+
+function formatFullClipCount(count: number): string {
+  return new Intl.NumberFormat().format(count);
+}
+
 export function Sidebar({
   selectedDate,
   viewMode,
@@ -49,6 +65,8 @@ export function Sidebar({
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search clips..."
+          title="Search clips"
+          aria-label="Search clips"
         />
       </label>
 
@@ -58,6 +76,8 @@ export function Sidebar({
             key={mode}
             className={mode === viewMode ? "active" : ""}
             onClick={() => onViewModeChange(mode)}
+            title={`Switch to ${mode} view`}
+            aria-label={`Switch to ${mode} view`}
           >
             {mode}
           </button>
@@ -88,8 +108,18 @@ export function Sidebar({
           {days.map((day) => {
             const dayKey = toDayKey(day.getTime());
             const count = countMap.get(dayKey) ?? 0;
+            const formattedCount = formatClipCount(count);
+            const fullCount = formatFullClipCount(count);
+
             const isSelected = dayKey === selectedDayKey;
             const isMuted = day.getMonth() !== currentMonth;
+
+            const dateLabel = day.toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            });
 
             return (
               <button
@@ -101,9 +131,19 @@ export function Sidebar({
                   count > 0 ? "has-clips" : "",
                 ].join(" ")}
                 onClick={() => onSelectDate(day)}
+                title={
+                  count > 0
+                    ? `${dateLabel} — ${fullCount} clips`
+                    : `${dateLabel} — no clips`
+                }
+                aria-label={
+                  count > 0
+                    ? `Select ${dateLabel}, ${fullCount} clips`
+                    : `Select ${dateLabel}, no clips`
+                }
               >
                 <span>{day.getDate()}</span>
-                {count > 0 ? <small>{count}</small> : null}
+                {count > 0 ? <small>{formattedCount}</small> : null}
               </button>
             );
           })}

@@ -2,12 +2,14 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default permissions for ClipB",
-  "windows": ["main"],
+  "windows": ["main", "quick"],
   "permissions": [
     "core:default",
 
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-image",
+    "clipboard-manager:allow-write-image",
 
     "sql:default",
     "sql:allow-execute",
@@ -16,6 +18,16 @@
 
     "fs:default",
     "fs:allow-read-text-file",
-    "fs:allow-write-text-file"
+    "fs:allow-write-text-file",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+
+    "global-shortcut:allow-is-registered",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }
