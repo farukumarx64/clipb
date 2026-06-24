@@ -3,30 +3,35 @@ import { ChevronLeft, ChevronRight, Settings, Clipboard } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 
-import type { AppSettings, Clip, DailyCount, ViewMode } from "./types";
-import type { ClipContentFilter, ClipFilters } from "./types";
+import type {
+  AppSettings,
+  Clip,
+  DailyCount,
+  ViewMode,
+  ClipContentFilter,
+  ClipTag,
+  Tag,
+} from "./types";
 import { ClipCard } from "./components/ClipCard";
 import { EmptyState } from "./components/EmptyState";
 import { Sidebar } from "./components/Sidebar";
 import { SettingsModal } from "./components/SettingsModal";
 import {
-  formatDayHeading,
-  formatViewTitle,
-  getRangeForView,
-  moveDate,
-  toDayKey,
-} from "./lib/dates";
-import {
+  addTagToClip,
   clearAllClips,
   deleteClip,
+  getAllTags,
   getAppSettings,
   getClipsByRangeWithFilters,
   getDailyCountsForMonth,
+  getTagsForClipIds,
+  removeTagFromClip,
   runRetentionCleanup,
   togglePinClip,
   updateAppSettings,
   updateClipFavorite,
   updateClipNote,
+  deleteUnusedTags,
 } from "./lib/db";
 import { useClipboardWatcher } from "./hooks/useClipboardWatcher";
 import { exportClipsToJsonFile, importClipsFromJsonFile } from "./lib/backup";
@@ -42,6 +47,13 @@ import {
   type ToastMessage,
   type ToastVariant,
 } from "./components/Toast";
+import {
+  formatDayHeading,
+  formatViewTitle,
+  getRangeForView,
+  moveDate,
+  toDayKey,
+} from "./lib/dates";
 
 function groupClipsByDay(clips: Clip[]) {
   return clips.reduce<Record<string, Clip[]>>((groups, clip) => {
@@ -135,15 +147,13 @@ export default function App() {
   const [contentFilter, setContentFilter] = useState<ClipContentFilter>("all");
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [clipTagsByClipId, setClipTagsByClipId] = useState<
+    Record<number, ClipTag[]>
+  >({});
+  const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
 
   const toastTimerRef = useRef<number | null>(null);
-
-  const clipFilters: ClipFilters = {
-    query,
-    contentFilter,
-    pinnedOnly,
-    favoritesOnly,
-  };
 
   const loadClips = useCallback(async () => {
     setLoading(true);
@@ -154,24 +164,47 @@ export default function App() {
       const rows = await getClipsByRangeWithFilters({
         start: range.start,
         end: range.end,
-        filters: clipFilters,
+        filters: {
+          query,
+          contentFilter,
+          pinnedOnly,
+          favoritesOnly,
+          selectedTagId,
+        },
       });
 
+      const tagsByClipId = await getTagsForClipIds(rows.map((clip) => clip.id));
+
       setClips(rows);
+      setClipTagsByClipId(tagsByClipId);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, viewMode, query, contentFilter, pinnedOnly, favoritesOnly]);
+  }, [
+    selectedDate,
+    viewMode,
+    query,
+    contentFilter,
+    pinnedOnly,
+    favoritesOnly,
+    selectedTagId,
+  ]);
 
   const loadDailyCounts = useCallback(async () => {
     const counts = await getDailyCountsForMonth(selectedDate);
     setDailyCounts(counts);
   }, [selectedDate]);
 
+  const loadAllTags = useCallback(async () => {
+    const tags = await getAllTags();
+    setAllTags(tags);
+  }, []);
+
   const refreshData = useCallback(async () => {
     await loadClips();
     await loadDailyCounts();
-  }, [loadClips, loadDailyCounts]);
+    await loadAllTags();
+  }, [loadClips, loadDailyCounts, loadAllTags]);
 
   const { error: watcherError } = useClipboardWatcher({
     settings,
@@ -275,6 +308,43 @@ export default function App() {
     toastTimerRef.current = window.setTimeout(() => {
       setToast(null);
     }, 2800);
+  }
+
+  async function handleAddTag(clipId: number, tagName: string) {
+    await addTagToClip(clipId, tagName);
+
+    const tagsByClipId = await getTagsForClipIds([clipId]);
+    const updatedAllTags = await getAllTags();
+
+    setClipTagsByClipId((current) => ({
+      ...current,
+      [clipId]: tagsByClipId[clipId] ?? [],
+    }));
+
+    setAllTags(updatedAllTags);
+  }
+
+  async function handleRemoveTag(clipId: number, tagId: number) {
+    await removeTagFromClip(clipId, tagId);
+    await deleteUnusedTags();
+
+    const updatedAllTags = await getAllTags();
+
+    setClipTagsByClipId((current) => ({
+      ...current,
+      [clipId]: (current[clipId] ?? []).filter((tag) => tag.tag_id !== tagId),
+    }));
+
+    setAllTags(updatedAllTags);
+
+    if (selectedTagId === tagId) {
+      setSelectedTagId(null);
+      await refreshData();
+    }
+  }
+
+  function handleSelectTag(tagId: number) {
+    setSelectedTagId(tagId);
   }
 
   async function handleCopy(clip: Clip) {
@@ -659,6 +729,26 @@ export default function App() {
           >
             Favorites
           </button>
+
+          <span className="tag-filter-compact">
+            <select
+              value={selectedTagId ?? "all"}
+              title="Filter clips by tag"
+              aria-label="Filter clips by tag"
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedTagId(value === "all" ? null : Number(value));
+              }}
+            >
+              <option value="all"># All</option>
+
+              {allTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  #{tag.name}
+                </option>
+              ))}
+            </select>
+          </span>
         </div>
 
         <section className="content">
@@ -677,11 +767,15 @@ export default function App() {
                         key={clip.id}
                         clip={clip}
                         copied={copiedId === clip.id}
+                        tags={clipTagsByClipId[clip.id] ?? []}
                         onCopy={handleCopy}
                         onDelete={handleDelete}
                         onTogglePin={handleTogglePin}
                         onToggleFavorite={handleToggleFavorite}
                         onUpdateNote={handleUpdateNote}
+                        onAddTag={handleAddTag}
+                        onRemoveTag={handleRemoveTag}
+                        onSelectTag={handleSelectTag}
                       />
                     ))}
                   </div>

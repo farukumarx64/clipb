@@ -13,6 +13,7 @@ export interface ClipFilters {
   contentFilter: ClipContentFilter;
   pinnedOnly: boolean;
   favoritesOnly: boolean;
+  selectedTagId: number | null;
 }
 
 export interface Clip {

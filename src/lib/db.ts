@@ -926,6 +926,39 @@ export async function getClipTags(clipId: number): Promise<ClipTag[]> {
   );
 }
 
+export async function getTagsForClipIds(
+  clipIds: number[],
+): Promise<Record<number, ClipTag[]>> {
+  if (clipIds.length === 0) return {};
+
+  const db = await getDb();
+  const placeholders = clipIds.map(() => "?").join(",");
+
+  const rows = await db.select<ClipTag[]>(
+    `
+      SELECT
+        clip_tags.clip_id,
+        tags.id AS tag_id,
+        tags.name
+      FROM clip_tags
+      INNER JOIN tags ON tags.id = clip_tags.tag_id
+      WHERE clip_tags.clip_id IN (${placeholders})
+      ORDER BY tags.name ASC;
+    `,
+    clipIds,
+  );
+
+  return rows.reduce<Record<number, ClipTag[]>>((groups, row) => {
+    if (!groups[row.clip_id]) {
+      groups[row.clip_id] = [];
+    }
+
+    groups[row.clip_id].push(row);
+
+    return groups;
+  }, {});
+}
+
 export async function addTagToClip(
   clipId: number,
   tagName: string,
@@ -983,6 +1016,38 @@ export async function removeTagFromClip(
   );
 }
 
+export async function deleteTag(tagId: number): Promise<void> {
+  const db = await getDb();
+
+  await db.execute(
+    `
+      DELETE FROM clip_tags
+      WHERE tag_id = ?;
+    `,
+    [tagId],
+  );
+
+  await db.execute(
+    `
+      DELETE FROM tags
+      WHERE id = ?;
+    `,
+    [tagId],
+  );
+}
+
+export async function deleteUnusedTags(): Promise<void> {
+  const db = await getDb();
+
+  await db.execute(`
+    DELETE FROM tags
+    WHERE id NOT IN (
+      SELECT DISTINCT tag_id
+      FROM clip_tags
+    );
+  `);
+}
+
 export async function getClipsByRangeWithFilters({
   start,
   end,
@@ -1015,6 +1080,19 @@ export async function getClipsByRangeWithFilters({
 
   if (filters.favoritesOnly) {
     conditions.push("is_favorite = 1");
+  }
+
+  if (filters.selectedTagId !== null) {
+    conditions.push(`
+    EXISTS (
+      SELECT 1
+      FROM clip_tags
+      WHERE clip_tags.clip_id = clips.id
+        AND clip_tags.tag_id = ?
+    )
+  `);
+
+    params.push(filters.selectedTagId);
   }
 
   return db.select<Clip[]>(

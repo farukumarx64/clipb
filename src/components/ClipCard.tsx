@@ -9,17 +9,22 @@ import {
   PinOff,
   Trash2,
 } from "lucide-react";
-import type { Clip } from "../types";
+import type { Clip, ClipTag } from "../types";
+import { ClipTags } from "./ClipTags";
 import { formatTime } from "../lib/dates";
 
 interface ClipCardProps {
   clip: Clip;
   copied: boolean;
+  tags: ClipTag[];
   onCopy: (clip: Clip) => void;
   onDelete: (id: number) => void;
   onTogglePin: (clip: Clip) => void;
   onToggleFavorite: (clip: Clip) => void;
   onUpdateNote: (clip: Clip, note: string | null) => void;
+  onAddTag: (clipId: number, tagName: string) => Promise<void> | void;
+  onRemoveTag: (clipId: number, tagId: number) => Promise<void> | void;
+  onSelectTag: (tagId: number) => void;
 }
 
 function getCategoryIcon(category: Clip["category"]) {
@@ -32,11 +37,15 @@ function getCategoryIcon(category: Clip["category"]) {
 export function ClipCard({
   clip,
   copied,
+  tags,
   onCopy,
   onDelete,
   onTogglePin,
   onToggleFavorite,
   onUpdateNote,
+  onAddTag,
+  onRemoveTag,
+  onSelectTag,
 }: ClipCardProps) {
   const preview =
     clip.content.length > 700
@@ -75,6 +84,16 @@ export function ClipCard({
           onUpdateNote(clip, event.target.value);
         }}
       />
+
+      <div className="clip-card__tags">
+        <ClipTags
+          clipId={clip.id}
+          tags={tags}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
+          onSelectTag={onSelectTag}
+        />
+      </div>
 
       <div className="clip-card__actions">
         <button
