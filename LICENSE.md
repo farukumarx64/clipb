@@ -1,6 +1,7 @@
 ClipB
 
 Copyright (C) 2026 Faruk Umar Idris
+
 This program is licensed under the GNU Affero General Public License version 3 or later.
 
                     GNU AFFERO GENERAL PUBLIC LICENSE

@@ -509,6 +509,8 @@ Thumbs.db
 - [x] Add `.clipb` archive export
 - [x] Add `.clipb` archive import
 - [x] Add asset preview cards
+- [x] Copy image clips back as images
+- [x] Copy file clips back as files
 
 ### v1.0 — Public Release
 
@@ -557,7 +559,6 @@ Possible future features:
 - Temporary clipboard sessions
 - Clipboard analytics
 - File/folder restore actions
-- Copy image clips back as real image data
 - Manage tags section in Settings
 - Cross-device encrypted backup
 
@@ -593,6 +594,10 @@ SPDX identifier:
 ```txt
 AGPL-3.0-or-later
 ```
+
+This means ClipB is free and open-source software. You may use, study, share, and modify it under the terms of the AGPL. If you distribute modified versions, or run modified versions as a network service, you must make the corresponding source code available under the same license.
+
+See See [`LICENSE.md`](./LICENSE.md) for the full license text.
 
 ---
 
