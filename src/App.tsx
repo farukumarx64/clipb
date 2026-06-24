@@ -709,6 +709,30 @@ export default function App() {
           <button
             className={[
               "filter-chip",
+              contentFilter === "image" ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setContentFilter("image")}
+            title="Show image clips"
+            aria-label="Show image clips"
+          >
+            Images
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
+              contentFilter === "file" ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setContentFilter("file")}
+            title="Show file clips"
+            aria-label="Show file clips"
+          >
+            Files
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
               pinnedOnly ? "filter-chip--active" : "",
             ].join(" ")}
             onClick={() => setPinnedOnly((value) => !value)}

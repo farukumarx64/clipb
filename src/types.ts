@@ -4,9 +4,15 @@ export type RetentionDays = "never" | "7" | "30" | "90" | "180" | "365";
 
 export type ThemeMode = "system" | "light" | "dark";
 
-export type ClipCategory = "text" | "url" | "code";
+export type ClipCategory = "text" | "url" | "code" | "image" | "file";
 
-export type ClipContentFilter = "all" | "text" | "url" | "code";
+export type ClipContentFilter =
+  | "all"
+  | "text"
+  | "url"
+  | "code"
+  | "image"
+  | "file";
 
 export interface ClipFilters {
   query?: string;
@@ -20,9 +26,15 @@ export interface Clip {
   id: number;
   content: string;
   content_hash: string;
-  content_type: "text/plain";
+  content_type: ClipContentType;
   category: ClipCategory;
   note: string | null;
+
+  asset_path: string | null;
+  asset_name: string | null;
+  asset_size: number | null;
+  asset_mime: string | null;
+
   created_at: number;
   updated_at: number;
   is_pinned: number;
@@ -77,3 +89,11 @@ export interface ClipTag {
   tag_id: number;
   name: string;
 }
+
+export type ClipContentType =
+  | "text/plain"
+  | "image/png"
+  | "image/jpeg"
+  | "image/webp"
+  | "file/path"
+  | "file/backup";

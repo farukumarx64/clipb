@@ -2,8 +2,10 @@ import {
   Check,
   Clipboard,
   Code2,
+  File,
   FileText,
   Heart,
+  ImageIcon,
   Link2,
   Pin,
   PinOff,
@@ -12,6 +14,7 @@ import {
 import type { Clip, ClipTag } from "../types";
 import { ClipTags } from "./ClipTags";
 import { formatTime } from "../lib/dates";
+import { formatBytes } from "../lib/assets";
 
 interface ClipCardProps {
   clip: Clip;
@@ -30,6 +33,8 @@ interface ClipCardProps {
 function getCategoryIcon(category: Clip["category"]) {
   if (category === "url") return <Link2 size={14} aria-hidden="true" />;
   if (category === "code") return <Code2 size={14} aria-hidden="true" />;
+  if (category === "image") return <ImageIcon size={14} aria-hidden="true" />;
+  if (category === "file") return <File size={14} aria-hidden="true" />;
 
   return <FileText size={14} aria-hidden="true" />;
 }
@@ -52,6 +57,12 @@ export function ClipCard({
       ? `${clip.content.slice(0, 700)}...`
       : clip.content;
 
+  function getAssetLabel(clip: Clip): string {
+    if (clip.asset_name) return clip.asset_name;
+    if (clip.content) return clip.content;
+
+    return "Untitled asset";
+  }
   return (
     <article className="clip-card">
       {clip.is_pinned ? (
@@ -72,7 +83,26 @@ export function ClipCard({
         </span>
       </div>
 
-      <pre className="clip-card__content">{preview}</pre>
+      {clip.category === "image" ? (
+        <div className="clip-asset-preview">
+          <div className="clip-asset-preview__placeholder">
+            <ImageIcon size={24} aria-hidden="true" />
+            <span>{getAssetLabel(clip)}</span>
+            <small>{formatBytes(clip.asset_size)}</small>
+          </div>
+        </div>
+      ) : clip.category === "file" ? (
+        <div className="clip-file-preview">
+          <File size={20} aria-hidden="true" />
+
+          <div>
+            <strong>{getAssetLabel(clip)}</strong>
+            <span>{formatBytes(clip.asset_size)}</span>
+          </div>
+        </div>
+      ) : (
+        <pre className="clip-card__content">{preview}</pre>
+      )}
 
       <textarea
         className="clip-note-input"

@@ -2,6 +2,9 @@ import Database from "@tauri-apps/plugin-sql";
 import type {
   AppSettings,
   Clip,
+  ClipTag,
+  Tag,
+  ClipFilters,
   DailyCount,
   ExportedClip,
   RetentionDays,
@@ -9,8 +12,7 @@ import type {
 } from "../types";
 import { hashText } from "./hash";
 import { detectClipCategory } from "./clipDetection";
-import type { ClipTag, Tag } from "../types";
-import type { ClipFilters } from "../types";
+import { deleteAssetFile } from "./assets";
 
 const DB_URL = "sqlite:clipb.db";
 
@@ -281,6 +283,34 @@ async function initDb(db: Db) {
     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
   );
 `);
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN asset_path TEXT DEFAULT NULL;
+  `,
+  );
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN asset_name TEXT DEFAULT NULL;
+  `,
+  );
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN asset_size INTEGER DEFAULT NULL;
+  `,
+  );
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN asset_mime TEXT DEFAULT NULL;
+  `,
+  );
 }
 
 export async function getDb() {
@@ -331,14 +361,32 @@ export async function saveClip(content: string): Promise<Clip | null> {
         content_type,
         category,
         note,
+        asset_path,
+        asset_name,
+        asset_size,
+        asset_mime,
         created_at,
         updated_at,
         is_pinned,
         is_favorite
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
-    [cleanContent, contentHash, "text/plain", category, null, now, now, 0, 0],
+    [
+      cleanContent,
+      contentHash,
+      "text/plain",
+      category,
+      null,
+      null,
+      null,
+      null,
+      null,
+      now,
+      now,
+      0,
+      0,
+    ],
   );
 
   const insertedId = result.lastInsertId;
@@ -467,6 +515,18 @@ export async function getDailyCountsForMonth(
 export async function deleteClip(id: number): Promise<void> {
   const db = await getDb();
 
+  const rows = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE id = ?
+      LIMIT 1;
+    `,
+    [id],
+  );
+
+  const clip = rows[0];
+
   await db.execute(
     `
       DELETE FROM clips
@@ -474,6 +534,10 @@ export async function deleteClip(id: number): Promise<void> {
     `,
     [id],
   );
+
+  if (clip?.asset_path) {
+    await deleteAssetFile(clip.asset_path);
+  }
 }
 
 export async function togglePinClip(
@@ -495,9 +559,21 @@ export async function togglePinClip(
 export async function clearAllClips(): Promise<number> {
   const db = await getDb();
 
+  const clipsWithAssets = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE asset_path IS NOT NULL;
+    `,
+  );
+
   const result = await db.execute(`
     DELETE FROM clips;
   `);
+
+  await Promise.all(
+    clipsWithAssets.map((clip) => deleteAssetFile(clip.asset_path)),
+  );
 
   return result.rowsAffected ?? 0;
 }
@@ -735,22 +811,33 @@ export async function runRetentionCleanup(
   const days = Number(activeSettings.historyRetentionDays);
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
 
-  const result = activeSettings.protectPinnedClips
-    ? await db.execute(
-        `
-          DELETE FROM clips
-          WHERE created_at < ?
-            AND is_pinned = 0;
-        `,
-        [cutoff],
-      )
-    : await db.execute(
-        `
-          DELETE FROM clips
-          WHERE created_at < ?;
-        `,
-        [cutoff],
-      );
+  const conditions = ["created_at < ?"];
+  const params: unknown[] = [cutoff];
+
+  if (activeSettings.protectPinnedClips) {
+    conditions.push("is_pinned = 0");
+  }
+
+  const clipsToDelete = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE ${conditions.join(" AND ")};
+    `,
+    params,
+  );
+
+  const result = await db.execute(
+    `
+      DELETE FROM clips
+      WHERE ${conditions.join(" AND ")};
+    `,
+    params,
+  );
+
+  await Promise.all(
+    clipsToDelete.map((clip) => deleteAssetFile(clip.asset_path)),
+  );
 
   return result.rowsAffected ?? 0;
 }
@@ -815,18 +902,26 @@ export async function importClipsFromBackup(
       content_type,
       category,
       note,
+      asset_path,
+      asset_name,
+      asset_size,
+      asset_mime,
       created_at,
       updated_at,
       is_pinned,
       is_favorite
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
   `,
       [
         cleanContent,
         contentHash,
         "text/plain",
         category,
+        null,
+        null,
+        null,
+        null,
         null,
         createdAt,
         updatedAt,
@@ -1104,4 +1199,88 @@ export async function getClipsByRangeWithFilters({
     `,
     params,
   );
+}
+
+export async function saveAssetClip(options: {
+  content: string;
+  contentHash: string;
+  contentType: Clip["content_type"];
+  category: Clip["category"];
+  assetPath: string;
+  assetName: string;
+  assetSize: number;
+  assetMime: string;
+}): Promise<Clip | null> {
+  const db = await getDb();
+  const now = Date.now();
+
+  const latest = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `,
+  );
+
+  const latestClip = latest[0];
+
+  if (
+    latestClip &&
+    latestClip.content_hash === options.contentHash &&
+    latestClip.asset_path === options.assetPath
+  ) {
+    return null;
+  }
+
+  const result = await db.execute(
+    `
+      INSERT INTO clips (
+        content,
+        content_hash,
+        content_type,
+        category,
+        note,
+        asset_path,
+        asset_name,
+        asset_size,
+        asset_mime,
+        created_at,
+        updated_at,
+        is_pinned,
+        is_favorite
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      options.content,
+      options.contentHash,
+      options.contentType,
+      options.category,
+      null,
+      options.assetPath,
+      options.assetName,
+      options.assetSize,
+      options.assetMime,
+      now,
+      now,
+      0,
+      0,
+    ],
+  );
+
+  const insertedId = result.lastInsertId;
+
+  if (!insertedId) return null;
+
+  const rows = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE id = ?;
+    `,
+    [insertedId],
+  );
+
+  return rows[0] ?? null;
 }
