@@ -4,6 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 
 import type { AppSettings, Clip, DailyCount, ViewMode } from "./types";
+import type { ClipContentFilter, ClipFilters } from "./types";
 import { ClipCard } from "./components/ClipCard";
 import { EmptyState } from "./components/EmptyState";
 import { Sidebar } from "./components/Sidebar";
@@ -19,11 +20,13 @@ import {
   clearAllClips,
   deleteClip,
   getAppSettings,
-  getClips,
+  getClipsByRangeWithFilters,
   getDailyCountsForMonth,
   runRetentionCleanup,
   togglePinClip,
   updateAppSettings,
+  updateClipFavorite,
+  updateClipNote,
 } from "./lib/db";
 import { useClipboardWatcher } from "./hooks/useClipboardWatcher";
 import { exportClipsToJsonFile, importClipsFromJsonFile } from "./lib/backup";
@@ -129,8 +132,18 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [contentFilter, setContentFilter] = useState<ClipContentFilter>("all");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   const toastTimerRef = useRef<number | null>(null);
+
+  const clipFilters: ClipFilters = {
+    query,
+    contentFilter,
+    pinnedOnly,
+    favoritesOnly,
+  };
 
   const loadClips = useCallback(async () => {
     setLoading(true);
@@ -138,17 +151,17 @@ export default function App() {
     try {
       const range = getRangeForView(selectedDate, viewMode);
 
-      const rows = await getClips({
+      const rows = await getClipsByRangeWithFilters({
         start: range.start,
         end: range.end,
-        query,
+        filters: clipFilters,
       });
 
       setClips(rows);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, viewMode, query]);
+  }, [selectedDate, viewMode, query, contentFilter, pinnedOnly, favoritesOnly]);
 
   const loadDailyCounts = useCallback(async () => {
     const counts = await getDailyCountsForMonth(selectedDate);
@@ -281,6 +294,16 @@ export default function App() {
 
   async function handleTogglePin(clip: Clip) {
     await togglePinClip(clip.id, clip.is_pinned);
+    await refreshData();
+  }
+
+  async function handleToggleFavorite(clip: Clip) {
+    await updateClipFavorite(clip.id, !clip.is_favorite);
+    await refreshData();
+  }
+
+  async function handleUpdateNote(clip: Clip, note: string | null) {
+    await updateClipNote(clip.id, note);
     await refreshData();
   }
 
@@ -502,6 +525,80 @@ export default function App() {
           </div>
         </header>
 
+        <div className="clip-filters">
+          <button
+            className={[
+              "filter-chip",
+              contentFilter === "all" ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setContentFilter("all")}
+            title="Show all clips"
+            aria-label="Show all clips"
+          >
+            All
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
+              contentFilter === "text" ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setContentFilter("text")}
+            title="Show text clips"
+            aria-label="Show text clips"
+          >
+            Text
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
+              contentFilter === "url" ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setContentFilter("url")}
+            title="Show URL clips"
+            aria-label="Show URL clips"
+          >
+            URLs
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
+              contentFilter === "code" ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setContentFilter("code")}
+            title="Show code clips"
+            aria-label="Show code clips"
+          >
+            Code
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
+              pinnedOnly ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setPinnedOnly((value) => !value)}
+            title="Show pinned clips only"
+            aria-label="Show pinned clips only"
+          >
+            Pinned
+          </button>
+
+          <button
+            className={[
+              "filter-chip",
+              favoritesOnly ? "filter-chip--active" : "",
+            ].join(" ")}
+            onClick={() => setFavoritesOnly((value) => !value)}
+            title="Show favorite clips only"
+            aria-label="Show favorite clips only"
+          >
+            Favorites
+          </button>
+        </div>
+
         <section className="content">
           {loading ? <p className="muted-text">Loading clips...</p> : null}
 
@@ -521,6 +618,8 @@ export default function App() {
                         onCopy={handleCopy}
                         onDelete={handleDelete}
                         onTogglePin={handleTogglePin}
+                        onToggleFavorite={handleToggleFavorite}
+                        onUpdateNote={handleUpdateNote}
                       />
                     ))}
                   </div>

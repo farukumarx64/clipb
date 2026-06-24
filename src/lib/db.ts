@@ -8,6 +8,9 @@ import type {
   ThemeMode,
 } from "../types";
 import { hashText } from "./hash";
+import { detectClipCategory } from "./clipDetection";
+import type { ClipTag, Tag } from "../types";
+import type { ClipFilters } from "../types";
 
 const DB_URL = "sqlite:clipb.db";
 
@@ -31,6 +34,23 @@ const DEFAULT_SETTINGS: AppSettings = {
   pauseUntil: null,
   ignoredApps: [],
 };
+
+async function tryExecute(db: Db, sql: string) {
+  try {
+    await db.execute(sql);
+  } catch (error) {
+    const message = String(error).toLowerCase();
+
+    if (
+      message.includes("duplicate column") ||
+      message.includes("already exists")
+    ) {
+      return;
+    }
+
+    throw error;
+  }
+}
 
 function getBooleanSetting(
   map: Map<string, string>,
@@ -222,6 +242,45 @@ async function initDb(db: Db) {
   `,
     ["ignored_apps", JSON.stringify(DEFAULT_SETTINGS.ignoredApps)],
   );
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN category TEXT NOT NULL DEFAULT 'text';
+  `,
+  );
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN note TEXT DEFAULT NULL;
+  `,
+  );
+
+  await tryExecute(
+    db,
+    `
+    ALTER TABLE clips ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0;
+  `,
+  );
+
+  await db.execute(`
+  CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL
+  );
+`);
+
+  await db.execute(`
+  CREATE TABLE IF NOT EXISTS clip_tags (
+    clip_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (clip_id, tag_id),
+    FOREIGN KEY (clip_id) REFERENCES clips(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+  );
+`);
 }
 
 export async function getDb() {
@@ -240,6 +299,7 @@ export async function saveClip(content: string): Promise<Clip | null> {
 
   if (!cleanContent) return null;
 
+  const category = detectClipCategory(cleanContent);
   const now = Date.now();
   const contentHash = hashText(cleanContent);
   const db = await getDb();
@@ -269,13 +329,16 @@ export async function saveClip(content: string): Promise<Clip | null> {
         content,
         content_hash,
         content_type,
+        category,
+        note,
         created_at,
         updated_at,
-        is_pinned
+        is_pinned,
+        is_favorite
       )
-      VALUES (?, ?, ?, ?, ?, ?);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
-    [cleanContent, contentHash, "text/plain", now, now, 0],
+    [cleanContent, contentHash, "text/plain", category, null, now, now, 0, 0],
   );
 
   const insertedId = result.lastInsertId;
@@ -742,25 +805,33 @@ export async function importClipsFromBackup(
       continue;
     }
 
+    const category = detectClipCategory(cleanContent);
+
     await db.execute(
       `
-        INSERT INTO clips (
-          content,
-          content_hash,
-          content_type,
-          created_at,
-          updated_at,
-          is_pinned
-        )
-        VALUES (?, ?, ?, ?, ?, ?);
-      `,
+    INSERT INTO clips (
+      content,
+      content_hash,
+      content_type,
+      category,
+      note,
+      created_at,
+      updated_at,
+      is_pinned,
+      is_favorite
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+  `,
       [
         cleanContent,
         contentHash,
         "text/plain",
+        category,
+        null,
         createdAt,
         updatedAt,
         clip.isPinned ? 1 : 0,
+        0,
       ],
     );
 
@@ -771,4 +842,188 @@ export async function importClipsFromBackup(
     imported,
     skipped,
   };
+}
+
+export async function updateClipFavorite(
+  clipId: number,
+  isFavorite: boolean,
+): Promise<void> {
+  const db = await getDb();
+
+  await db.execute(
+    `
+      UPDATE clips
+      SET is_favorite = ?, updated_at = ?
+      WHERE id = ?;
+    `,
+    [isFavorite ? 1 : 0, Date.now(), clipId],
+  );
+}
+
+export async function updateClipNote(
+  clipId: number,
+  note: string | null,
+): Promise<void> {
+  const db = await getDb();
+
+  await db.execute(
+    `
+      UPDATE clips
+      SET note = ?, updated_at = ?
+      WHERE id = ?;
+    `,
+    [note?.trim() ? note.trim() : null, Date.now(), clipId],
+  );
+}
+
+export async function updateClipCategory(
+  clipId: number,
+  category: Clip["category"],
+): Promise<void> {
+  const db = await getDb();
+
+  await db.execute(
+    `
+      UPDATE clips
+      SET category = ?, updated_at = ?
+      WHERE id = ?;
+    `,
+    [category, Date.now(), clipId],
+  );
+}
+
+function normalizeTagName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+export async function getAllTags(): Promise<Tag[]> {
+  const db = await getDb();
+
+  return db.select<Tag[]>(
+    `
+      SELECT *
+      FROM tags
+      ORDER BY name ASC;
+    `,
+  );
+}
+
+export async function getClipTags(clipId: number): Promise<ClipTag[]> {
+  const db = await getDb();
+
+  return db.select<ClipTag[]>(
+    `
+      SELECT
+        clip_tags.clip_id,
+        tags.id AS tag_id,
+        tags.name
+      FROM clip_tags
+      INNER JOIN tags ON tags.id = clip_tags.tag_id
+      WHERE clip_tags.clip_id = ?
+      ORDER BY tags.name ASC;
+    `,
+    [clipId],
+  );
+}
+
+export async function addTagToClip(
+  clipId: number,
+  tagName: string,
+): Promise<void> {
+  const db = await getDb();
+  const normalizedName = normalizeTagName(tagName);
+
+  if (!normalizedName) return;
+
+  const now = Date.now();
+
+  await db.execute(
+    `
+      INSERT OR IGNORE INTO tags (name, created_at)
+      VALUES (?, ?);
+    `,
+    [normalizedName, now],
+  );
+
+  const tags = await db.select<Tag[]>(
+    `
+      SELECT *
+      FROM tags
+      WHERE name = ?
+      LIMIT 1;
+    `,
+    [normalizedName],
+  );
+
+  const tag = tags[0];
+
+  if (!tag) return;
+
+  await db.execute(
+    `
+      INSERT OR IGNORE INTO clip_tags (clip_id, tag_id)
+      VALUES (?, ?);
+    `,
+    [clipId, tag.id],
+  );
+}
+
+export async function removeTagFromClip(
+  clipId: number,
+  tagId: number,
+): Promise<void> {
+  const db = await getDb();
+
+  await db.execute(
+    `
+      DELETE FROM clip_tags
+      WHERE clip_id = ? AND tag_id = ?;
+    `,
+    [clipId, tagId],
+  );
+}
+
+export async function getClipsByRangeWithFilters({
+  start,
+  end,
+  filters,
+}: {
+  start: number;
+  end: number;
+  filters: ClipFilters;
+}): Promise<Clip[]> {
+  const db = await getDb();
+
+  const conditions = ["created_at >= ?", "created_at < ?"];
+  const params: unknown[] = [start, end];
+
+  const query = filters.query?.trim();
+
+  if (query) {
+    conditions.push("(content LIKE ? OR note LIKE ?)");
+    params.push(`%${query}%`, `%${query}%`);
+  }
+
+  if (filters.contentFilter !== "all") {
+    conditions.push("category = ?");
+    params.push(filters.contentFilter);
+  }
+
+  if (filters.pinnedOnly) {
+    conditions.push("is_pinned = 1");
+  }
+
+  if (filters.favoritesOnly) {
+    conditions.push("is_favorite = 1");
+  }
+
+  return db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY is_pinned DESC, created_at DESC;
+    `,
+    params,
+  );
 }

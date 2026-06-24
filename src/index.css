@@ -569,10 +569,22 @@ button:active {
 }
 
 .pill {
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  min-height: 24px;
   border-radius: 999px;
-  background: var(--brand-soft);
-  color: var(--brand-text);
+  padding: 4px 9px;
+
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--panel-solid);
+
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -1378,4 +1390,105 @@ button:active {
     bottom: 12px;
     width: calc(100vw - 24px);
   }
+}
+
+.clip-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.filter-chip {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  background: var(--panel-solid);
+  font-size: 13px;
+}
+
+.filter-chip:hover {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.filter-chip--active {
+  color: var(--text);
+  border-color: rgba(37, 99, 235, 0.45);
+  background: var(--brand-soft);
+}
+
+.clip-category {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  width: fit-content;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 4px 9px;
+
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--panel-solid);
+
+  font-size: 12px;
+  line-height: 1;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.clip-category--url {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.28);
+}
+
+.clip-category--code {
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.clip-category--text {
+  color: var(--muted);
+}
+
+.icon-button--active {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.08);
+}
+
+.icon-button--favorite {
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.08);
+}
+
+.clip-note-input {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  margin-top: 12px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--panel-solid);
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.clip-note-input::placeholder {
+  color: var(--muted);
+}
+
+.clip-note-input:focus {
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 4px var(--brand-soft);
 }
