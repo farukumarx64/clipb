@@ -344,7 +344,7 @@ Thumbs.db
 
 ### v0.5 — Better Organization
 
-- [ ] Add tags
+- [x] Add tags
 - [x] Add favorite clips
 - [x] Add clip categories
 - [x] Add manual notes
