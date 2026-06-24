@@ -84,6 +84,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   privateMode: false,
   pauseUntil: null,
   ignoredApps: [],
+  backupCopiedFiles: false,
+  maxBackupFileSizeMb: 25,
 };
 
 function formatPauseRemaining(milliseconds: number): string {

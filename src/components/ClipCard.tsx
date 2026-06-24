@@ -104,7 +104,13 @@ export function ClipCard({
 
           <div>
             <strong>{getAssetLabel(clip)}</strong>
-            <span>{formatBytes(clip.asset_size)}</span>
+            <span>
+              {clip.content_type === "file/backup"
+                ? `Backed up · ${formatBytes(clip.asset_size)}`
+                : clip.asset_mime === "inode/directory"
+                  ? "Folder path"
+                  : `Path only · ${formatBytes(clip.asset_size)}`}
+            </span>
           </div>
         </div>
       ) : (

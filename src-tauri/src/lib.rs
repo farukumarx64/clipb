@@ -108,6 +108,134 @@ struct FilePathInfo {
     is_dir: bool,
 }
 
+#[derive(Debug, Serialize)]
+struct BackedUpFileAsset {
+    content_hash: String,
+    asset_path: String,
+    asset_name: String,
+    asset_size: u64,
+    asset_mime: String,
+}
+
+fn guessed_mime_for_path(path: &Path) -> &'static str {
+    let extension = path
+        .extension()
+        .map(|value| value.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    match extension.as_str() {
+        "txt" => "text/plain",
+        "md" => "text/markdown",
+        "json" => "application/json",
+        "pdf" => "application/pdf",
+        "zip" => "application/zip",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "mp4" => "video/mp4",
+        "mp3" => "audio/mpeg",
+        "csv" => "text/csv",
+        "html" => "text/html",
+        "css" => "text/css",
+        "js" => "text/javascript",
+        "ts" => "text/typescript",
+        "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        _ => "application/octet-stream",
+    }
+}
+
+fn safe_backup_filename(original_path: &Path) -> Result<String, String> {
+    let file_name = original_path
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+
+    let safe_name: String = file_name
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric()
+                || character == '-'
+                || character == '_'
+                || character == '.'
+            {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect();
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_millis();
+
+    Ok(format!(
+        "{}-{}",
+        timestamp,
+        if safe_name.trim().is_empty() {
+            "file"
+        } else {
+            safe_name.trim_matches('-')
+        }
+    ))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn backup_file_to_assets(
+    app: tauri::AppHandle,
+    path: String,
+    max_size_bytes: u64,
+) -> Result<BackedUpFileAsset, String> {
+    let source_path = PathBuf::from(&path);
+
+    if !source_path.exists() {
+        return Err("File path does not exist".to_string());
+    }
+
+    if !source_path.is_file() {
+        return Err("Only files can be backed up right now".to_string());
+    }
+
+    let metadata = fs::metadata(&source_path).map_err(|error| error.to_string())?;
+    let file_size = metadata.len();
+
+    if file_size > max_size_bytes {
+        return Err(format!("File is too large to back up: {} bytes", file_size));
+    }
+
+    let bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let content_hash = hex::encode(hasher.finalize());
+
+    let assets_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("assets")
+        .join("files");
+
+    fs::create_dir_all(&assets_dir).map_err(|error| error.to_string())?;
+
+    let asset_name = safe_backup_filename(&source_path)?;
+    let asset_path = assets_dir.join(&asset_name);
+
+    fs::write(&asset_path, &bytes).map_err(|error| error.to_string())?;
+
+    Ok(BackedUpFileAsset {
+        content_hash,
+        asset_path: asset_path.to_string_lossy().into_owned(),
+        asset_name,
+        asset_size: file_size,
+        asset_mime: guessed_mime_for_path(&source_path).to_string(),
+    })
+}
+
 #[tauri::command]
 fn inspect_file_path(path: String) -> Result<FilePathInfo, String> {
     let file_path = PathBuf::from(&path);
@@ -354,7 +482,8 @@ pub fn run() {
             get_active_app,
             import_image_file_to_assets,
             read_clipboard_file_paths,
-            inspect_file_path
+            inspect_file_path,
+            backup_file_to_assets
         ])
         .setup(|app| {
             #[cfg(desktop)]

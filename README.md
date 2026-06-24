@@ -357,8 +357,7 @@ Thumbs.db
 
 - [x] Add image clipboard support
 - [x] Add copied image file support on macOS Finder copy
-- [x] Add copied file path support
-- [ ] Add copied non-image file path support
+- [x] Add copied non-image file path support
 - [ ] Add optional copied file backup
 - [ ] Add `.clipb` archive export
 - [ ] Add `.clipb` archive import

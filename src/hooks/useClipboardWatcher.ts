@@ -12,7 +12,6 @@ import {
 import {
   getImagePathFromClipboardText,
   saveImageFileFromPath,
-  getFirstImagePathFromPaths,
   isSupportedImagePath,
 } from "../lib/imageFileImport";
 import { readNativeClipboardFilePaths } from "../lib/nativeClipboardFiles";
@@ -108,7 +107,10 @@ export function useClipboardWatcher({
 
           for (const path of nonImagePaths) {
             try {
-              const saved = await saveFilePathFromPath(path);
+              const saved = await saveFilePathFromPath(path, {
+                backupCopiedFiles: settings.backupCopiedFiles,
+                maxBackupFileSizeMb: settings.maxBackupFileSizeMb,
+              });
 
               if (saved) {
                 savedAny = true;
@@ -169,7 +171,10 @@ export function useClipboardWatcher({
 
           for (const path of nonImagePaths) {
             try {
-              const saved = await saveFilePathFromPath(path);
+              const saved = await saveFilePathFromPath(path, {
+                backupCopiedFiles: settings.backupCopiedFiles,
+                maxBackupFileSizeMb: settings.maxBackupFileSizeMb,
+              });
 
               if (saved) {
                 savedAny = true;

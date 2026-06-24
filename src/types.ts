@@ -61,6 +61,9 @@ export interface AppSettings {
   privateMode: boolean;
   pauseUntil: number | null;
   ignoredApps: string[];
+
+  backupCopiedFiles: boolean;
+  maxBackupFileSizeMb: number;
 }
 
 export interface ExportedClip {

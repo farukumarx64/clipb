@@ -35,6 +35,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   privateMode: false,
   pauseUntil: null,
   ignoredApps: [],
+  backupCopiedFiles: false,
+  maxBackupFileSizeMb: 25,
 };
 
 async function tryExecute(db: Db, sql: string) {
@@ -310,6 +312,22 @@ async function initDb(db: Db) {
     `
     ALTER TABLE clips ADD COLUMN asset_mime TEXT DEFAULT NULL;
   `,
+  );
+
+  await db.execute(
+    `
+    INSERT OR IGNORE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+    ["backup_copied_files", String(DEFAULT_SETTINGS.backupCopiedFiles)],
+  );
+
+  await db.execute(
+    `
+    INSERT OR IGNORE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+    ["max_backup_file_size_mb", String(DEFAULT_SETTINGS.maxBackupFileSizeMb)],
   );
 }
 
@@ -684,6 +702,17 @@ export async function getAppSettings(): Promise<AppSettings> {
       "ignored_apps",
       DEFAULT_SETTINGS.ignoredApps,
     ),
+    backupCopiedFiles: getBooleanSetting(
+      map,
+      "backup_copied_files",
+      DEFAULT_SETTINGS.backupCopiedFiles,
+    ),
+
+    maxBackupFileSizeMb: getNumberSetting(
+      map,
+      "max_backup_file_size_mb",
+      DEFAULT_SETTINGS.maxBackupFileSizeMb,
+    ),
   };
 }
 
@@ -795,6 +824,22 @@ export async function updateAppSettings(settings: AppSettings): Promise<void> {
     VALUES (?, ?);
   `,
     ["ignored_apps", JSON.stringify(settings.ignoredApps)],
+  );
+
+  await db.execute(
+    `
+    INSERT OR REPLACE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+    ["backup_copied_files", String(settings.backupCopiedFiles)],
+  );
+
+  await db.execute(
+    `
+    INSERT OR REPLACE INTO settings (key, value)
+    VALUES (?, ?);
+  `,
+    ["max_backup_file_size_mb", String(settings.maxBackupFileSizeMb)],
   );
 }
 
@@ -1259,6 +1304,88 @@ export async function saveFilePathClip(options: {
       options.name,
       options.size,
       options.isDirectory ? "inode/directory" : null,
+      now,
+      now,
+      0,
+      0,
+    ],
+  );
+
+  const insertedId = result.lastInsertId;
+
+  if (!insertedId) return null;
+
+  const rows = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE id = ?;
+    `,
+    [insertedId],
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function saveBackedUpFileClip(options: {
+  originalPath: string;
+  contentHash: string;
+  assetPath: string;
+  assetName: string;
+  assetSize: number;
+  assetMime: string;
+}): Promise<Clip | null> {
+  const cleanPath = options.originalPath.trim();
+
+  if (!cleanPath) return null;
+
+  const db = await getDb();
+  const now = Date.now();
+
+  const existing = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE content_hash = ?
+        AND content_type = 'file/backup'
+      LIMIT 1;
+    `,
+    [options.contentHash],
+  );
+
+  if (existing.length > 0) {
+    return null;
+  }
+
+  const result = await db.execute(
+    `
+      INSERT INTO clips (
+        content,
+        content_hash,
+        content_type,
+        category,
+        note,
+        asset_path,
+        asset_name,
+        asset_size,
+        asset_mime,
+        created_at,
+        updated_at,
+        is_pinned,
+        is_favorite
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      cleanPath,
+      options.contentHash,
+      "file/backup",
+      "file",
+      null,
+      options.assetPath,
+      options.assetName,
+      options.assetSize,
+      options.assetMime,
       now,
       now,
       0,

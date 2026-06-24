@@ -588,6 +588,66 @@ export function SettingsModal({
             </label>
           </section>
 
+          <div className="settings-section">
+            <div>
+              <h3>Copied file backup</h3>
+              <p>
+                Save a private local copy of copied files inside ClipB. Folders
+                are saved as paths only.
+              </p>
+            </div>
+
+            <label className="setting-row">
+              <div>
+                <strong>Back up copied files</strong>
+                <span>
+                  When enabled, copied files are stored in ClipB assets instead
+                  of only saving their original path.
+                </span>
+              </div>
+
+              <input
+                type="checkbox"
+                checked={settings.backupCopiedFiles}
+                onChange={(event) =>
+                  updateSetting({
+                    ...settings,
+                    backupCopiedFiles: event.target.checked,
+                  })
+                }
+              />
+            </label>
+
+            <label className="setting-row">
+              <div>
+                <strong>Maximum backup size</strong>
+                <span>
+                  Files larger than this are saved as path-only clips.
+                </span>
+              </div>
+
+              <input
+                className="number-input"
+                type="number"
+                min={1}
+                max={500}
+                value={settings.maxBackupFileSizeMb}
+                disabled={!settings.backupCopiedFiles}
+                title="Maximum backup file size in megabytes"
+                aria-label="Maximum backup file size in megabytes"
+                onChange={(event) =>
+                  updateSetting({
+                    ...settings,
+                    maxBackupFileSizeMb: Math.max(
+                      1,
+                      Number(event.target.value) || 25,
+                    ),
+                  })
+                }
+              />
+            </label>
+          </div>
+
           <section className="settings-section danger-zone">
             <h3>Danger zone</h3>
             <p>This permanently deletes local clipboard history.</p>
