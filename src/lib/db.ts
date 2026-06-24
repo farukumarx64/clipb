@@ -1201,6 +1201,87 @@ export async function getClipsByRangeWithFilters({
   );
 }
 
+export async function saveFilePathClip(options: {
+  path: string;
+  name: string;
+  size: number | null;
+  isDirectory: boolean;
+}): Promise<Clip | null> {
+  const cleanPath = options.path.trim();
+
+  if (!cleanPath) return null;
+
+  const db = await getDb();
+  const now = Date.now();
+  const contentHash = hashText(`file/path:${cleanPath}`);
+
+  const existing = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE content_hash = ?
+        AND content_type = 'file/path'
+      LIMIT 1;
+    `,
+    [contentHash],
+  );
+
+  if (existing.length > 0) {
+    return null;
+  }
+
+  const result = await db.execute(
+    `
+      INSERT INTO clips (
+        content,
+        content_hash,
+        content_type,
+        category,
+        note,
+        asset_path,
+        asset_name,
+        asset_size,
+        asset_mime,
+        created_at,
+        updated_at,
+        is_pinned,
+        is_favorite
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      cleanPath,
+      contentHash,
+      "file/path",
+      "file",
+      null,
+      null,
+      options.name,
+      options.size,
+      options.isDirectory ? "inode/directory" : null,
+      now,
+      now,
+      0,
+      0,
+    ],
+  );
+
+  const insertedId = result.lastInsertId;
+
+  if (!insertedId) return null;
+
+  const rows = await db.select<Clip[]>(
+    `
+      SELECT *
+      FROM clips
+      WHERE id = ?;
+    `,
+    [insertedId],
+  );
+
+  return rows[0] ?? null;
+}
+
 export async function saveAssetClip(options: {
   content: string;
   contentHash: string;

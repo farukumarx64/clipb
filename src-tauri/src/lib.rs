@@ -99,6 +99,43 @@ struct ImportedImageAsset {
     asset_mime: String,
 }
 
+#[derive(Debug, Serialize)]
+struct FilePathInfo {
+    path: String,
+    name: String,
+    size: Option<u64>,
+    is_file: bool,
+    is_dir: bool,
+}
+
+#[tauri::command]
+fn inspect_file_path(path: String) -> Result<FilePathInfo, String> {
+    let file_path = PathBuf::from(&path);
+
+    if !file_path.exists() {
+        return Err("File path does not exist".to_string());
+    }
+
+    let metadata = fs::metadata(&file_path).map_err(|error| error.to_string())?;
+
+    let name = file_path
+        .file_name()
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.clone());
+
+    Ok(FilePathInfo {
+        path,
+        name,
+        size: if metadata.is_file() {
+            Some(metadata.len())
+        } else {
+            None
+        },
+        is_file: metadata.is_file(),
+        is_dir: metadata.is_dir(),
+    })
+}
+
 fn image_mime_for_path(path: &Path) -> Option<&'static str> {
     let extension = path.extension()?.to_string_lossy().to_lowercase();
 
@@ -197,6 +234,16 @@ fn import_image_file_to_assets(
         asset_size: bytes.len() as u64,
         asset_mime: mime.to_string(),
     })
+}
+
+#[tauri::command]
+fn read_clipboard_file_paths() -> Result<Vec<String>, String> {
+    let paths = clipboard_files::read().map_err(|error| format!("{error:?}"))?;
+
+    Ok(paths
+        .into_iter()
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect())
 }
 
 #[tauri::command]
@@ -305,7 +352,9 @@ pub fn run() {
             hide_quick_window,
             quit_app,
             get_active_app,
-            import_image_file_to_assets
+            import_image_file_to_assets,
+            read_clipboard_file_paths,
+            inspect_file_path
         ])
         .setup(|app| {
             #[cfg(desktop)]

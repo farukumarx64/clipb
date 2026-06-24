@@ -355,12 +355,14 @@ Thumbs.db
 
 ### v0.6 — Rich Clipboard Support
 
-- [ ] Add image clipboard support
-- [ ] Add copied file path support
+- [x] Add image clipboard support
+- [x] Add copied image file support on macOS Finder copy
+- [x] Add copied file path support
+- [ ] Add copied non-image file path support
 - [ ] Add optional copied file backup
 - [ ] Add `.clipb` archive export
 - [ ] Add `.clipb` archive import
-- [ ] Add asset preview cards
+- [x] Add asset preview cards
 
 ### v1.0 — Public Release
 

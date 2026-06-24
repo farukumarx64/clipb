@@ -6,9 +6,16 @@ import { scanClipPrivacy } from "../lib/privacy";
 import { getActiveApp, isIgnoredApp } from "../lib/activeApp";
 import { saveClipboardImage } from "../lib/imageClipboard";
 import {
+  getNonImageFilePaths,
+  saveFilePathFromPath,
+} from "../lib/fileClipboard";
+import {
   getImagePathFromClipboardText,
   saveImageFileFromPath,
+  getFirstImagePathFromPaths,
+  isSupportedImagePath,
 } from "../lib/imageFileImport";
+import { readNativeClipboardFilePaths } from "../lib/nativeClipboardFiles";
 
 interface UseClipboardWatcherOptions {
   settings: AppSettings;
@@ -31,6 +38,7 @@ export function useClipboardWatcher({
   const lastSeenImagePathRef = useRef<string>("");
   const isCheckingRef = useRef(false);
   const lastImageProbeAtRef = useRef(0);
+  const lastSeenNativeFileKeyRef = useRef<string>("");
 
   const IMAGE_PROBE_COOLDOWN_MS = 3500;
 
@@ -58,6 +66,64 @@ export function useClipboardWatcher({
               ? `ignored_app:${activeApp.app_name}`
               : "ignored_app",
           );
+          return;
+        }
+
+        // 1. Try native copied files first.
+        // This catches normal Finder Command+C file copies on macOS.
+        const nativeFilePaths = await readNativeClipboardFilePaths();
+
+        if (nativeFilePaths.length > 0) {
+          const nativeFileKey = nativeFilePaths.join("\n");
+
+          // Important:
+          // If native file paths exist, do not continue to readImage().
+          // macOS Finder can also expose a preview image on the clipboard,
+          // which would create duplicate image clips.
+          if (nativeFileKey === lastSeenNativeFileKeyRef.current) {
+            return;
+          }
+
+          lastSeenNativeFileKeyRef.current = nativeFileKey;
+
+          let savedAny = false;
+
+          const imageFilePaths = nativeFilePaths.filter(isSupportedImagePath);
+          const nonImagePaths = getNonImageFilePaths(nativeFilePaths);
+
+          for (const path of imageFilePaths) {
+            try {
+              const saved = await saveImageFileFromPath(path);
+
+              if (saved) {
+                savedAny = true;
+              }
+            } catch (error) {
+              console.debug(
+                "Could not import native copied image file:",
+                error,
+              );
+            }
+          }
+
+          for (const path of nonImagePaths) {
+            try {
+              const saved = await saveFilePathFromPath(path);
+
+              if (saved) {
+                savedAny = true;
+              }
+            } catch (error) {
+              console.debug("Could not save copied file path:", error);
+            }
+          }
+
+          if (savedAny) {
+            setLastSavedAt(Date.now());
+            onSaved?.();
+            setError(null);
+          }
+
           return;
         }
 
@@ -94,6 +160,32 @@ export function useClipboardWatcher({
           } catch (error) {
             console.debug("No image pixels on clipboard:", error);
           }
+        }
+
+        const nonImagePaths = getNonImageFilePaths(nativeFilePaths);
+
+        if (nonImagePaths.length > 0) {
+          let savedAny = false;
+
+          for (const path of nonImagePaths) {
+            try {
+              const saved = await saveFilePathFromPath(path);
+
+              if (saved) {
+                savedAny = true;
+              }
+            } catch (error) {
+              console.debug("Could not save copied file path:", error);
+            }
+          }
+
+          if (savedAny) {
+            setLastSavedAt(Date.now());
+            onSaved?.();
+            setError(null);
+          }
+
+          return;
         }
 
         // 2. Then try text clipboard.

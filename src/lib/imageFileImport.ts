@@ -78,3 +78,15 @@ export async function saveImageFileFromPath(
     assetMime: imported.asset_mime,
   });
 }
+
+export function isSupportedImagePath(path: string): boolean {
+  const lowerPath = path.toLowerCase();
+
+  return IMAGE_FILE_EXTENSIONS.some((extension) =>
+    lowerPath.endsWith(extension),
+  );
+}
+
+export function getFirstImagePathFromPaths(paths: string[]): string | null {
+  return paths.find(isSupportedImagePath) ?? null;
+}
