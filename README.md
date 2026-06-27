@@ -79,6 +79,28 @@ ClipB gives your clipboard memory without forcing cloud sync, accounts, or exter
 
 ---
 
+## Screenshots
+
+### Timeline View
+
+![ClipB timeline view](./docs/screenshots/timeline.png)
+
+### Rich Clipboard Support
+
+![ClipB rich clipboard support](./docs/screenshots/rich-clips.png)
+
+### Settings and Privacy
+
+![ClipB settings and privacy controls](./docs/screenshots/settings.png)
+
+### Quick Copy Window
+
+![ClipB quick copy window](./docs/screenshots/quick-copy.png)
+
+### Calendar Sidebar
+
+![ClipB calendar sidebar](./docs/screenshots/calendar.png)
+
 ## Tech Stack
 
 | Area                     | Technology                         |
@@ -519,8 +541,8 @@ Thumbs.db
 - [ ] Add Windows build
 - [ ] Add macOS build
 - [ ] Add Linux build
-- [ ] Add release notes
-- [ ] Add privacy policy
+- [x] Add release notes
+- [x] Add privacy policy
 - [ ] Add landing page
 - [ ] Add screenshots/GIF demo
 - [ ] Add GitHub releases
