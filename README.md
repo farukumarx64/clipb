@@ -79,6 +79,28 @@ ClipB gives your clipboard memory without forcing cloud sync, accounts, or exter
 
 ---
 
+## Screenshots
+
+### Timeline View
+
+![ClipB timeline view](./docs/screenshots/timeline.png)
+
+### Rich Clipboard Support
+
+![ClipB rich clipboard support](./docs/screenshots/rich-clips.png)
+
+### Settings and Privacy
+
+![ClipB settings and privacy controls](./docs/screenshots/settings.png)
+
+### Quick Copy Window
+
+![ClipB quick copy window](./docs/screenshots/quick-copy.png)
+
+### Calendar Sidebar
+
+![ClipB calendar sidebar](./docs/screenshots/calendar.png)
+
 ## Tech Stack
 
 | Area                     | Technology                         |
@@ -514,23 +536,29 @@ Thumbs.db
 
 ### v1.0 — Public Release
 
-- [ ] Add app icon
+- [x] Add app icon
 - [ ] Add installer builds
 - [ ] Add Windows build
 - [ ] Add macOS build
 - [ ] Add Linux build
-- [ ] Add release notes
-- [ ] Add privacy policy
+- [x] Add release notes
+- [x] Add privacy policy
 - [ ] Add landing page
-- [ ] Add screenshots/GIF demo
+- [x] Add screenshots/GIF demo
 - [ ] Add GitHub releases
 - [ ] Add signed builds if needed
 
 ---
 
+### macOS security note
+
+This build is currently unsigned and not notarized. macOS may show a warning when opening the app. This will be improved in a future signed release.
+
+---
+
 ## Product Principles
 
-ClipB should stay:
+ClipB will stay:
 
 - Fast
 - Local-first
@@ -562,7 +590,7 @@ Possible future features:
 - Manage tags section in Settings
 - Cross-device encrypted backup
 
-Cloud sync should not be added until the local-first app is stable and privacy controls are strong.
+Cloud sync will not be added until the local-first app is stable and privacy controls are strong.
 
 ---
 
